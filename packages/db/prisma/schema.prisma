@@ -1583,3 +1583,88 @@ model Apikey {
   @@index([key])
   @@map("apikey")
 }
+
+/**
+ * Operator control-plane metadata. These records do not themselves grant data
+ * access to the existing single-workspace CRM runtime.
+ */
+model PlatformTenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  status    String   @default("PENDING")
+  organizationId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  credentials PlatformCredential[]
+  policies    PlatformTenantPolicy[]
+  @@map("platform_tenant")
+}
+
+model PlatformIntegration {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  category  String
+  status    String   @default("DISABLED")
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  credentials PlatformCredential[]
+  @@map("platform_integration")
+}
+
+model PlatformCredential {
+  id             String   @id @default(cuid())
+  integrationId  String
+  integration    PlatformIntegration @relation(fields: [integrationId], references: [id], onDelete: Restrict)
+  tenantId       String?
+  tenant         PlatformTenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  purpose        String
+  ciphertext     String
+  iv             String
+  authTag        String
+  keyVersion     String
+  lastFour       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@unique([integrationId, tenantId, purpose])
+  @@index([tenantId])
+  @@map("platform_credential")
+}
+
+model PlatformTenantPolicy {
+  id             String @id @default(cuid())
+  tenantId       String
+  tenant         PlatformTenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  key            String
+  value          Json
+  updatedAt      DateTime @updatedAt
+  @@unique([tenantId, key])
+  @@map("platform_tenant_policy")
+}
+
+model PlatformUsageEvent {
+  id             String @id @default(cuid())
+  tenantId       String?
+  providerKey    String
+  capability     String
+  units          Int
+  occurredAt     DateTime @default(now())
+  requestId      String @unique
+  @@index([tenantId, occurredAt])
+  @@map("platform_usage_event")
+}
+
+model PlatformAuditEvent {
+  id             String @id @default(cuid())
+  actorId        String
+  action         String
+  resourceType   String
+  resourceId     String
+  details        Json @default("{}")
+  createdAt      DateTime @default(now())
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+  @@map("platform_audit_event")
+}
