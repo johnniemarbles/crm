@@ -1,38 +1,28 @@
 import Link from "next/link";
-import { db } from "@crm/db";
-import { requirePlatformOperator } from "@/lib/platform-access";
-
+import { platformSummary } from "@/lib/platform-service";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Platform Overview | CRMONIA" };
-
 export default async function PlatformOverview() {
-  await requirePlatformOperator();
-  const [users, agents, runs] = await Promise.all([
-    db.user.count(),
-    db.agentDefinition.count(),
-    db.agentRun.count(),
-  ]);
-  return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-semibold">Platform overview</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Operational inventory from the active database. This is not a tenant count.</p></div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[["Registered users", users], ["Agent definitions", agents], ["Agent runs (all time)", runs]].map(([label, value]) => (
-          <div key={label} className="rounded-xl border p-5">
-            <div className="text-sm text-muted-foreground">{label}</div>
-            <div className="mt-2 text-3xl font-semibold tabular-nums">{value}</div>
-          </div>
-        ))}
-      </div>
-      <div className="rounded-xl border p-5">
-        <h2 className="font-semibold">Control-plane readiness</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Workspace configuration and platform configuration are different boundaries. The current schema does not yet provide a standalone tenant directory or a platform-scoped integration registry.</p>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <Link href="/platform/integrations" className="underline">Review integrations</Link>
-          <Link href="/platform/tenants" className="underline">Review tenant provisioning gap</Link>
-          <Link href="/platform/security" className="underline">Review security controls</Link>
-        </div>
-      </div>
-    </div>
-  );
+ const data = await platformSummary();
+ return <div className="space-y-6">
+  <div><h1 className="text-2xl font-semibold">Platform overview</h1>
+   <p className="mt-2 text-sm text-muted-foreground">Actual control-plane records and existing CRM activity; tenant registration is not equivalent to tenant runtime activation.</p>
+  </div>
+  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+   {([["Registered tenants",data.tenants],["Providers",data.integrations],["Stored credentials",data.credentials],["CRM users",data.users],["Agent runs",data.runs]] as const).map(([label,value])=>
+    <div key={label} className="rounded-xl border p-5"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-2 text-3xl font-semibold tabular-nums">{value}</div></div>)}
+  </div>
+  <div className="rounded-xl border p-5"><h2 className="font-semibold">Administration</h2>
+   <div className="mt-3 grid gap-2 sm:grid-cols-2">
+    {([["Tenant registry","/platform/tenants"],["Integration setup","/platform/integrations"],["AI usage","/platform/ai"],["Security audit","/platform/security"]] as const).map(([name,url])=>
+     <Link key={url} href={url} className="rounded-lg border p-3 text-sm hover:bg-muted">{name}</Link>)}
+   </div>
+  </div>
+  <div className="rounded-xl border p-5"><h2 className="font-semibold">Latest operator actions</h2>
+   <div className="mt-3 divide-y">{data.recentAudit.length===0 && <p className="text-sm text-muted-foreground">No operator actions recorded.</p>}
+    {data.recentAudit.map(a=><div className="flex flex-wrap justify-between gap-2 py-3 text-sm" key={a.id}><span>{a.action} · {a.resourceType}</span><time className="text-muted-foreground">{a.createdAt.toISOString()}</time></div>)}
+   </div>
+  </div>
+  <p className="text-sm text-muted-foreground">Tenant runtime isolation, adapter execution, quotas and platform role management must be completed before this console can govern live multi-tenant traffic.</p>
+ </div>;
 }
